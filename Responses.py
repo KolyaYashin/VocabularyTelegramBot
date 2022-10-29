@@ -71,12 +71,13 @@ def start_command(updates, _):
 def help_command(updates, _):
     updates.message.reply_text('If you wanna start, just put your new word, then put its translation, definition on '
                                'target language, example of usage and its tag. \n'
-                               'If you want to test your words, just write /test.\n'
                                '/view command will show your own dictionary. \n'
-                               '/search some_word and /delete some_word do certain job with word,'
+                               '/search _some_word_ and /delete _some_word_ do certain job with word,'
                                ' you have typed after space\n'
-                               '/test number tag command starts test with selected number '
-                               'and tag of words. This test based on space learning technique.')
+                               '/test _number_ _tag_ command starts test with selected number '
+                               'and tag of words. This test based on space learning technique.\n'
+                               '/change word command will change selected word. You just need to select\n'
+                               'feature you want to change and write new.')
 
 
 def time_command(updates, _):
