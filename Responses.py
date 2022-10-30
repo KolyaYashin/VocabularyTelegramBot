@@ -4,16 +4,17 @@ import numpy as np
 from telegram.ext import ConversationHandler
 
 pd.options.mode.chained_assignment = None
-df = pd.read_csv('dictionary.csv')
 test_n = 0
 test_wr = 0
 test_correct = 0
 test_incorrect = 0
 sample = list([])
 bad = set([])
-vocab = set(df.en)
 change_index = 0
 change_choice = ''
+user_id = 504042287
+df = pd.read_csv(f'data/dictionary_{user_id}.csv')
+vocab = set(df.en)
 
 word_to_add = {'en': [], 'ru': [], 'def': [],
                'example': [], 'tag': [],
@@ -55,17 +56,20 @@ def set_c(data):
 
 def update_df():
     global df
-    df = pd.read_csv('dictionary.csv')
+    df = pd.read_csv(f'data/dictionary_{user_id}.csv')
     df = set_c(df)
-    df.to_csv('dictionary.csv', index=False)
+    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
 
 
 update_df()
 
 
 def start_command(updates, _):
+    global user_id
+    user_id = updates.message.chat_id
     update_df()
     updates.message.reply_text('This bot is based on flash cards.\n If you want some help, just type /help below.')
+    print(updates.message.chat_id)
 
 
 def help_command(updates, _):
@@ -116,11 +120,11 @@ def skip_example_command(update, _):
 
 def tag_message(update, _):
     global df
-    df = pd.read_csv('dictionary.csv')
+    df = pd.read_csv(f'data/dictionary_{user_id}.csv')
     word_to_add['tag'] = [update.message.text.lower()]
     df = df.append(pd.DataFrame.from_dict(word_to_add))
     df = set_c(df)
-    df.to_csv('dictionary.csv', index=False)
+    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     update.message.reply_text(f'Your tag is {update.message.text.lower()}.\n'
                               f'Word {word_to_add["en"][0]} is successfully added.')
     return ConversationHandler.END
@@ -169,7 +173,7 @@ def change_start(update, context):
 def change(update, _):
     global df
     df[change_choice][change_index] = update.message.text.lower()
-    df.to_csv('dictionary.csv', index=False)
+    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     update.message.reply_text('You changed word successfully.')
     return ConversationHandler.END
 
@@ -213,7 +217,7 @@ def delete_command(update, context):
     index = this_word.index[0]
     word_str = this_word['en'][index]
     df = df.drop(index, axis=0)
-    df.to_csv('dictionary.csv', index=False)
+    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     update.message.reply_text(f'Word {word_str} was deleted successfully')
     return 0
 
@@ -224,7 +228,7 @@ def view_command(update, context):
     if len(context.args) == 0:
         update.message.reply_text(str(df))
         return 0
-    view_tag = str(context.args[0])
+    view_tag = " ".join(context.args)
     update.message.reply_text(str(df[df['tag'] == view_tag]))
     return 0
 
@@ -267,7 +271,7 @@ def test_command(update, context):
 
 def stop_test(update, _):
     update.message.reply_text(f'You just stopped test.\nYour score was {test_wr}.')
-    df.to_csv('dictionary.csv', index=False)
+    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     return ConversationHandler.END
 
 
@@ -291,7 +295,7 @@ def check_word(update, _):
 
     if test_i == -1:
         update.message.reply_text(f'You have just completed test successfully.\nYour final score is {test_wr}')
-        df.to_csv('dictionary.csv', index=False)
+        df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
         return ConversationHandler.END
     return 1
 
