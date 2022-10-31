@@ -12,7 +12,8 @@ sample = list([])
 bad = set([])
 change_index = 0
 change_choice = ''
-user_id = 504042287
+my_id = 504042287
+user_id=my_id
 df = pd.read_csv(f'data/dictionary_{user_id}.csv')
 vocab = set(df.en)
 
