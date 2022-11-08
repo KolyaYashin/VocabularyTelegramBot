@@ -4,45 +4,15 @@ import numpy as np
 from telegram.ext import ConversationHandler
 
 pd.options.mode.chained_assignment = None
-test_n = 0
-test_wr = 0
-test_correct = 0
-test_incorrect = 0
-sample = list([])
-bad = set([])
-change_index = 0
-change_choice = ''
-my_id = 504042287
-user_id=my_id
-df = pd.read_csv(f'data/dictionary_{user_id}.csv')
-vocab = set(df.en)
-
-word_to_add = {'en': [], 'ru': [], 'def': [],
-               'example': [], 'tag': [],
-               'now': [datetime.now()], 'last_check': [datetime.now()],
-               'days_before': [0], 'correct': [0],
-               'incorrect': [0], 'wr': [0],
-               'coefficient': [1]}
-
-test_i = -1
-target = ''
-native = ''
-definition = ''
-ex = ''
+C = 0.1
 
 
-def sample_generator(input_list):
-    global bad
+def sample_generator(input_list, bad):
     while len(bad) > 0:
         for i in input_list:
             if i in bad:
                 yield i
     yield -1
-
-
-sample_gen = sample_generator(sample)
-
-C = 0.1
 
 
 def set_c(data):
@@ -55,22 +25,8 @@ def set_c(data):
     return data
 
 
-def update_df():
-    global df
-    df = pd.read_csv(f'data/dictionary_{user_id}.csv')
-    df = set_c(df)
-    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
-
-
-update_df()
-
-
 def start_command(updates, _):
-    global user_id
-    user_id = updates.message.chat_id
-    update_df()
     updates.message.reply_text('This bot is based on flash cards.\n If you want some help, just type /help below.')
-    print(updates.message.chat_id)
 
 
 def help_command(updates, _):
@@ -89,43 +45,50 @@ def time_command(updates, _):
     updates.message.reply_text(f'Right now {datetime.now()}')
 
 
-def handle_message(update, _):
-    word_to_add['en'] = [update.message.text.lower()]
+def handle_message(update, context):
+    context.user_data['en'] = update.message.text.lower()
     update.message.reply_text(f'Your word is {update.message.text.lower()}.\nEnter its translation: ')
     return 1
 
 
-def translation_message(update, _):
-    word_to_add['ru'] = [update.message.text.lower()]
+def translation_message(update, context):
+    context.user_data['ru'] = update.message.text.lower()
     update.message.reply_text(f'Your translation is {update.message.text.lower()}.\nEnter its definition:')
     return 2
 
 
-def definition_message(update, _):
-    word_to_add['def'] = [update.message.text.lower()]
+def definition_message(update, context):
+    context.user_data['def'] = update.message.text.lower()
     update.message.reply_text(f'Your definition is "{update.message.text.lower()}".\nEnter example or put /skip:')
     return 3
 
 
-def example_message(update, _):
-    word_to_add['example'] = [update.message.text.lower()]
+def example_message(update, context):
+    context.user_data['example'] = update.message.text.lower()
     update.message.reply_text(f'Your example is "{update.message.text.lower()}".\nEnter its tag:')
     return 4
 
 
-def skip_example_command(update, _):
-    word_to_add['example'] = ['']
+def skip_example_command(update, context):
+    context.user_data['example'] = ''
     update.message.reply_text(f'You have skipped example. \nEnter its tag:')
     return 4
 
 
-def tag_message(update, _):
-    global df
-    df = pd.read_csv(f'data/dictionary_{user_id}.csv')
-    word_to_add['tag'] = [update.message.text.lower()]
-    df = df.append(pd.DataFrame.from_dict(word_to_add))
-    df = set_c(df)
-    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
+def tag_message(update, context):
+    user_id = update.message.chat_id
+    data = pd.read_csv(f'data/dictionary_{user_id}.csv')
+    context.user_data['tag'] = update.message.text.lower()
+    d = context.user_data
+    word_to_add = {'en': [d["en"]], 'ru': [d["ru"]], 'def': [d["def"]],
+                   'example': [d["example"]], 'tag': [d["tag"]],
+                   'now': [datetime.now()], 'last_check': [datetime.now()],
+                   'days_before': [0], 'correct': [0],
+                   'incorrect': [0], 'wr': [0],
+                   'coefficient': [1]}
+    data = data.append(pd.DataFrame.from_dict(word_to_add))
+    data = set_c(data)
+    data.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     update.message.reply_text(f'Your tag is {update.message.text.lower()}.\n'
                               f'Word {word_to_add["en"][0]} is successfully added.')
     return ConversationHandler.END
@@ -137,9 +100,10 @@ def cancel_command(update, _):
 
 
 def search_command(update, context):
-    update_df()
+    user_id = update.message.chat_id
+    data = pd.read_csv(f"data/dictionary_{user_id}.csv")
     word = " ".join(context.args)
-    this_word = df[df['en'] == word]
+    this_word = data[data['en'] == word]
     if len(this_word.index) == 0:
         update.message.reply_text("This word doesn't exist")
         return 0
@@ -154,83 +118,80 @@ def search_command(update, context):
 
 
 def change_start(update, context):
-    global df, change_index
-    update_df()
+    user_id = update.message.chat_id
+    data = pd.read_csv(f"data/dictionary_{user_id}.csv")
     word = " ".join(context.args)
-    this_word = df[df['en'] == word]
+    this_word = data[data['en'] == word]
     if len(this_word.index) == 0:
         update.message.reply_text("This word doesn't exist.")
         return ConversationHandler.END
-    change_index = this_word.index[0]
+    context.user_data["change_index"] = this_word.index[0]
     update.message.reply_text(f'The word you want to change:\n'
-                              f'Its translation: {this_word["ru"][change_index]}, '
-                              f'its meaning: {this_word["def"][change_index]}, '
-                              f'example of using this word: {this_word["example"][change_index]}, '
-                              f'its tag: {this_word["tag"][change_index]}.')
+                              f'Its translation: {this_word["ru"][context.user_data["change_index"]]}, '
+                              f'its meaning: {this_word["def"][context.user_data["change_index"]]}, '
+                              f'example of using this word: {this_word["example"][context.user_data["change_index"]]}, '
+                              f'its tag: {this_word["tag"][context.user_data["change_index"]]}.')
     update.message.reply_text(f'Select what you want to change and click on /trans, /def, /example or /tag.')
     return 1
 
 
-def change(update, _):
-    global df
-    df[change_choice][change_index] = update.message.text.lower()
-    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
+def change(update, context):
+    user_id = update.message.chat_id
+    data = pd.read_csv(f"data/dictionary_{user_id}.csv")
+    data[context.user_data["change_choice"]][context.user_data["change_index"]] = update.message.text.lower()
+    data.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     update.message.reply_text('You changed word successfully.')
     return ConversationHandler.END
 
 
-def change_trans(update, _):
-    global change_choice
-    change_choice = 'ru'
+def change_trans(update, context):
+    context.user_data["change_choice"] = "ru"
     update.message.reply_text('Write new translation')
     return 2
 
 
-def change_def(update, _):
-    global change_choice
-    change_choice = 'def'
+def change_def(update, context):
+    context.user_data["change_choice"] = "def"
     update.message.reply_text('Write new definition')
     return 2
 
 
-def change_example(update, _):
-    global change_choice
-    change_choice = 'example'
+def change_example(update, context):
+    context.user_data["change_choice"] = "example"
     update.message.reply_text('Write new example')
     return 2
 
 
-def change_tag(update, _):
-    global change_choice
-    change_choice = 'tag'
+def change_tag(update, context):
+    context.user_data["change_choice"] = "tag"
     update.message.reply_text('Write new tag')
     return 2
 
 
 def delete_command(update, context):
-    global df
-    update_df()
+    user_id = update.message.chat_id
+    data = pd.read_csv(f"data/dictionary_{user_id}.csv")
     word = " ".join(context.args)
-    this_word = df[df['en'] == word]
+    this_word = data[data['en'] == word]
     if len(this_word.index) == 0:
         update.message.reply_text("This word doesn't exist")
         return 0
     index = this_word.index[0]
     word_str = this_word['en'][index]
-    df = df.drop(index, axis=0)
-    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
+    data = data.drop(index, axis=0)
+    data.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     update.message.reply_text(f'Word {word_str} was deleted successfully')
     return 0
 
 
 def view_command(update, context):
-    global df
-    update_df()
+    user_id = update.message.chat_id
+    data = pd.read_csv(f"data/dictionary_{user_id}.csv")
     if len(context.args) == 0:
-        update.message.reply_text(str(df))
+        update.message.reply_text(str(data))
         return 0
     view_tag = " ".join(context.args)
-    update.message.reply_text(str(df[df['tag'] == view_tag]))
+    update.message.reply_text(str(data[data['tag'] == view_tag]))
     return 0
 
 
@@ -247,17 +208,18 @@ def get_next_word(gen, update):
 
 
 def test_command(update, context):
-    global test_wr, test_correct, test_incorrect, sample, sample_gen, bad, df, test_i, test_n
+    global test_wr, test_correct, test_incorrect, sample, sample_gen, bad, test_i, test_n
     test_n = int(context.args[0])
-    update_df()
-    test_wr = 0
-    test_correct = 0
-    test_incorrect = 0
+    user_id = update.message.chat_id
+    data = pd.read_csv(f"data/dictionary_{user_id}.csv")
+    context.user_data["test_wr"] = 0
+    context.user_data["test_correct"] = 0
+    context.user_data["test_incorrect"] = 0
     test_tag = " ".join(context.args[1:])
     if test_tag == '':
-        sample = list((df.iloc[:test_n, :]).index)
+        sample = list((data.iloc[:test_n, :]).index)
     else:
-        sample = list((df[df.tag == test_tag].iloc[:test_n, :]).index)
+        sample = list((data[data.tag == test_tag].iloc[:test_n, :]).index)
 
     if len(sample) == 0:
         update.message.reply_text(f"Tag {test_tag} doesn't exist")
@@ -271,6 +233,7 @@ def test_command(update, context):
 
 
 def stop_test(update, _):
+    user_id = update.message.chat_id
     update.message.reply_text(f'You just stopped test.\nYour score was {test_wr}.')
     df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     return ConversationHandler.END
@@ -278,7 +241,7 @@ def stop_test(update, _):
 
 def check_word(update, _):
     global bad, sample, sample_gen, df, test_correct, test_incorrect, test_wr
-
+    user_id = update.message.chat_id
     my_word = str(update.message.text).lower()
     if my_word == target:
         update.message.reply_text(f'Correct! Example: {ex}')
