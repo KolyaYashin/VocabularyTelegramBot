@@ -206,15 +206,15 @@ def get_next_word(gen, update, context, data):
         context.user_data['definition'] = definition
         ex = data['example'][context.user_data["test_i"]]
         context.user_data['ex'] = ex
-        data['last_check'][context.user_data["test_i"]] = datetime.now()
         update.message.reply_text(f'Ru: {native}\nDefinition: {definition}')
-    return data
+    return
 
 
 def test_command(update, context):
     test_n = int(context.args[0])
     user_id = update.message.chat_id
     data = pd.read_csv(f"data/dictionary_{user_id}.csv")
+    data = set_c(data)
     context.user_data["test_wr"] = 0
     context.user_data["test_correct"] = 0
     context.user_data["test_incorrect"] = 0
@@ -227,27 +227,32 @@ def test_command(update, context):
     if len(sample) == 0:
         update.message.reply_text(f"Tag {test_tag} doesn't exist")
         return ConversationHandler.END
-    sample_gen = sample_generator(sample)
     bad = set(sample)
+    sample_gen = sample_generator(sample, bad)
     context.user_data["sample"] = sample
     context.user_data["bad"] = bad
     context.user_data["sample_gen"] = sample_gen
     context.user_data["test_n"] = test_n
     update.message.reply_text(f'Test with {test_n} words is beginning.')
-    data = get_next_word(sample_gen, update, context, data)
+    get_next_word(sample_gen, update, context, data)
     return 1
 
 
 def stop_test(update, context):
     user_id = update.message.chat_id
     update.message.reply_text(f'You just stopped test.\nYour score was {context.user_data["test_wr"]}.')
-    df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
+    data = pd.read_csv(f"data/dictionary_{user_id}.csv")
+    for ind in context.user_data['sample']:
+        data.loc[ind, 'last_check'] = datetime.now()
+    data = set_c(data)
+    data.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     return ConversationHandler.END
 
 
 def check_word(update, context):
     user_id = update.message.chat_id
     my_word = str(update.message.text).lower()
+    df = pd.read_csv(f"data/dictionary_{user_id}.csv")
     if my_word == context.user_data['target']:
         update.message.reply_text(f'Correct! Example: {context.user_data["ex"]}')
         context.user_data["test_correct"] = context.user_data["test_correct"] + 1
@@ -256,19 +261,24 @@ def check_word(update, context):
         df['correct'][context.user_data["test_i"]] += 1
         bad = context.user_data["bad"]
         bad.remove(context.user_data["test_i"])
-        context.user_data = bad
+        context.user_data['bad'] = bad
+        df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
     else:
         update.message.reply_text(f'Incorrect!\nCorrect one is {context.user_data["target"]}.')
         context.user_data["test_incorrect"] = context.user_data["test_incorrect"] + 1
         context.user_data["test_wr"] = context.user_data["test_incorrect"] / \
                                        (context.user_data["test_correct"] + context.user_data["test_incorrect"])
         df['incorrect'][context.user_data["test_i"]] += 1
+        df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
 
-    get_next_word(context.user_data["sample_gen"], update, context, data)
+    get_next_word(context.user_data["sample_gen"], update, context, df)
 
     if context.user_data["test_i"] == -1:
         update.message.reply_text(f'You have just completed test successfully.'
                                   f'\nYour final score is {context.user_data["test_wr"]}')
+        for ind in context.user_data['sample']:
+            df.loc[ind, 'last_check'] = datetime.now()
+        df = set_c(df)
         df.to_csv(f'data/dictionary_{user_id}.csv', index=False)
         return ConversationHandler.END
     return 1
