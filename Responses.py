@@ -4,7 +4,7 @@ import numpy as np
 from telegram.ext import ConversationHandler
 
 pd.options.mode.chained_assignment = None
-C = 0.1
+C = 0.2
 
 
 def sample_generator(input_list, bad):
